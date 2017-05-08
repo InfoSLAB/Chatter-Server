@@ -30,8 +30,8 @@
         	var command = tokens[0];
       		socket.emit(command, user_input);
        		socket.emit('chat message', user_input);
-        	});
-          	return false;
+          $('#m').val = '';
+        	return false;
         });
         socket.on('chat message', function(msg){
           $('#messages').append($('<li>').text(msg));
