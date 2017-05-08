@@ -42,22 +42,20 @@ io.on('connection', function(socket){
   });
   socket.on('register', function(data) {
   	console.log('receive register ' + data);
-  	var email = data.email;
-  	var username = data.username;
-  	var pubkey = data.pubkey;
+  	var new_user = {};
+  	new_user.email = data.email;
+  	new_user.username = data.username;
+  	new_user.pubkey = data.pubkey;
   	socket.emit('register', { user: username, id: 1 });
   });
-  socket.on('friend', function(msg) {
-  	console.log('receive friend ' + msg);
+  socket.on('friend', function(data) {
+  	console.log('receive friend ' + data);
   });
   socket.on('chat', function(msg) {
   	console.log('receive chat ' + msg);
   });
   socket.on('file', function(msg) {
   	console.log('receive file ' + msg);
-  });
-  socket.on('file', function(msg) {
-  	console.log('file again ' + msg);
   });
   socket.on('disconnect', function() {
   	console.log('client disconnected');
