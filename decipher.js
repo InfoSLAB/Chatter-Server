@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+var ursa = require('ursa');
 
 module.exports = {
 	aes: function(encrypted, key, fn) {
@@ -14,6 +15,16 @@ module.exports = {
 		})
 		decipher.write(encrypted, 'hex');
 		decipher.end();
+	},
+	rsa_pub: function(encrypted, pubPem) {
+		var key = ursa.createPublicKey(pubPem);
+		var decrypted = key.publicDecrypt(encrypted, 'base64', 'utf8');
+		return decrypted;
+	},
+	rsa_priv: function(encrypted, priPem) {
+		var key = ursa.createPrivateKey(priPem);
+		var decrypted = key.decrypt(encrypted, 'base64', 'utf8');
+		return decrypted;
 	}
 }
 

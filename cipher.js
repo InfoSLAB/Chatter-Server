@@ -1,7 +1,12 @@
 const crypto = require('crypto');
-const rsa = require('node-rsa');
+var NodeRsa = require('node-rsa');
+var ursa = require('ursa');
+var rstr = require('randomstring');
 
 module.exports = {
+	aes_gen_key: function() {
+		return rstr.generate(10);
+	},
 	aes: function(plain, key, fn) {
 		const cipher = crypto.createCipher('aes192', key);
 		let encrypted = '';
@@ -16,39 +21,46 @@ module.exports = {
 		cipher.write(plain);
 		cipher.end();
 	},
-	rsa: function(plain, key, fn) {
-
-	}
+	rsa_gen_key_pair: function() {
+		var key_pair = new NodeRsa({b: 2048});
+		var privKeyStr = key_pair.exportKey('pkcs8-private-pem');
+		var pubKeyStr = key_pair.exportKey('pkcs8-public-pem');
+		return {
+			pubkey: pubKeyStr,
+			privkey: privKeyStr,
+		}
+	},
+	rsa_pub: function(plain, pubPem) {
+		var key = ursa.createPublicKey(pubPem);
+		var encrypted = key.encrypt(plain, 'utf8', 'base64');
+		return encrypted;
+	},
+	rsa_priv: function(plain, priPem) {
+		var key = ursa.createPrivateKey(priPem);
+		var encrypted = key.privateEncrypt(plain, 'utf8', 'base64');
+		return encrypted;
+	},
 }
 
-var ursa = require('ursa');
-var fs = require('fs');
+// var key = new NodeRsa({b: 512});
+// var privKeyStr = (key.exportKey('pkcs8-private-pem'));
+// var pubKeyStr = (key.exportKey('pkcs8-public-pem'));
 
-// create a pair of keys (a private key contains both keys...)
-var keys = ursa.generatePrivateKey();
-console.log('keys:', keys);
+// // var key1 = new NodeRsa();
+// // key1.importKey(privKeyStr, 'pkcs8');
+// var key1 = ursa.createPrivateKey(privKeyStr);
+// var key2 = ursa.createPublicKey(pubKeyStr);
 
-// reconstitute the private key from a base64 encoding
-var privPem = keys.toPrivatePem('base64');
-console.log('privPem:', privPem);
 
-var priv = ursa.createPrivateKey(privPem, '', 'base64');
+// var enc = key2.encrypt('hahaha', 'utf8', 'base64');
+// var dec = key1.decrypt(enc, 'base64', 'utf8');
+// console.log(enc);
+// console.log(dec.toString());
 
-// make a public key, to be used for encryption
-var pubPem = keys.toPublicPem('base64');
-console.log('pubPem:', pubPem);
-
-var pub = ursa.createPublicKey(pubPem, 'base64');
-
-// encrypt, with the private key, then decrypt with the public
-var data = new Buffer('hello world');
-console.log('data:', data);
-
-var enc = pub.encrypt(data);
-console.log('enc:', enc);
-
-var unenc = priv.decrypt(enc);
-console.log('unenc:', unenc);
+// var enc = key1.privateEncrypt('hahaha', 'utf8', 'base64');
+// var dec = key2.publicDecrypt(enc, 'base64', 'utf8');
+// console.log(enc);
+// console.log(dec.toString());
 
 // const cipher = crypto.createCipher('aes192', 'a password');
 

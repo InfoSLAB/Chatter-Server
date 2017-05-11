@@ -49,9 +49,10 @@ io.on('connection', function(socket){
     }
     var pubkey = user.pubkey;
     // TODO generate aes_key
-    var aes_key = 'a password';
+    var aes_key = cipher.aes_gen_key();
+    console.log('aes_key:', aes_key);
     // TODO encrypt aes_key with user`s pubkey
-    var encrypted_aes_key = aes_key;
+    var encrypted_aes_key = cipher.rsa_pub(aes_key, pubkey);
     challenge = parseInt(Math.random() * 10000);
     // TODO encrypt challenge with aes_key
     var encrypted_challenge = challenge;
