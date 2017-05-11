@@ -13,6 +13,7 @@
     "mongodb": "^2.2.26",
     "prompt": "^1.0.0",
     "socket.io": "^1.7.4",
-    "socket.io-client": "^1.7.4"
+    "socket.io-client": "^1.7.4",
+    "ursa": "^0.9.4"
   }
 }
