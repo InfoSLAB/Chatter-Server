@@ -46,7 +46,7 @@ io.on('connection', function(socket){
   	new_user.email = data.email;
   	new_user.username = data.username;
   	new_user.pubkey = data.pubkey;
-  	socket.emit('register', { user: username, id: 1 });
+  	// socket.emit('register', { user: username, id: 1 });
   });
   socket.on('friend', function(data) {
   	console.log('receive friend ' + data);
@@ -66,6 +66,3 @@ io.on('connection', function(socket){
 http.listen(port, function(){
   console.log('listening on *:' + port);
 });
-
-// decipher.aes('ca981be48e90867604588e75d04feabb63cc007a8f8ad89b10616ed84d815504', 'a password', console.log);
-// cipher.aes('some clear text data', 'a password', console.log);
