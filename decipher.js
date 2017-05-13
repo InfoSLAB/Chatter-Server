@@ -2,7 +2,7 @@ const crypto = require('crypto');
 var ursa = require('ursa');
 
 module.exports = {
-	aes: function(encrypted, key, fn) {
+	aes: function(encrypted, key) {
 		const decipher = crypto.createDecipher('aes192', key);
 		let decrypted = '';
 		decipher.on('readable', () => {
@@ -10,11 +10,16 @@ module.exports = {
 			if (data)
 				decrypted += data.toString('utf8');
 		});
+		var flag = false;
 		decipher.on('end', () => {
-			fn(decrypted);
+			flag = true;
 		})
 		decipher.write(encrypted, 'hex');
 		decipher.end();
+		while (!flag) {
+			require('deasync').runLoopOnce();
+		}
+		return decrypted;
 	},
 	rsa_pub: function(encrypted, pubPem) {
 		var key = ursa.createPublicKey(pubPem);

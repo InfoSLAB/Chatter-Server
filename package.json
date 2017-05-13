@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "deasync": "^0.1.9",
     "express": "^4.15.2",
     "mongodb": "^2.2.26",
     "node-rsa": "^0.4.2",

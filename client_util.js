@@ -18,19 +18,16 @@ module.exports = {
 			}
 			console.log('session key:', aes_key);
 			user.session_key = aes_key;
-			decipher.aes(cha_res, aes_key, function(cha_res_plain) {
-				if (cha_res_plain != user.my_challenge + 1) {
-					console.log('response:', cha_res_plain);
-					console.log('challenge:', user.my_challenge);
-					console.log('server challenge fail.');
-					return ;
-				}
-				decipher.aes(challenge, aes_key, function(challenge_plain) {
-					user.server_challenge = challenge_plain;
-					console.log(challenge_plain);
-				});
-			});
-
+			var cha_res_plain = decipher.aes(cha_res, aes_key);
+			if (cha_res_plain != user.my_challenge + 1) {
+				console.log('response:', cha_res_plain);
+				console.log('challenge:', user.my_challenge);
+				console.log('server challenge fail.');
+				return ;
+			}
+			var challenge_plain = decipher.aes(challenge, aes_key);
+			user.server_challenge = challenge_plain;
+			console.log('server_challenge:', challenge_plain);
 		},
 		'login-ack': function(data, user) {
 			console.log(data);
@@ -39,10 +36,12 @@ module.exports = {
 			console.log(data);
 		},
 		friend: function(data, user) {
-			console.log(data);
+			var aes_key = user.session_key;
+			console.log(JSON.parse(decipher.aes(data, aes_key)));
 		},
 		chat: function(data, user) {
-			console.log(data);
+			var aes_key = user.session_key;
+			console.log(JSON.parse(decipher.aes(data, aes_key)));
 		}
 	},
 	message: {
@@ -57,9 +56,11 @@ module.exports = {
 			}
 		},
 		'login-ack': function(tokens, user) {
+			var session_key = user.session_key;
+			var enc_challenge = cipher.aes(tokens[1].toString(), session_key.toString());
 			return {
 				username: tokens[0],
-				challenge: parseInt(tokens[1], 10),
+				challenge: enc_challenge,
 			}
 		},
 		register: function(tokens, user) {
@@ -70,18 +71,20 @@ module.exports = {
 			}
 		},
 		friend: function(tokens, user) {
-			return {
+			var aes_key = user.session_key;
+			return cipher.aes(JSON.stringify({
 				sender: tokens[0],
 				receiver: tokens[1],
 				type: tokens[2],  // (q)uery, (a)ccept, (d)eny, (l)ist
-			}
+			}), aes_key);
 		},
 		chat: function(tokens, user) {
-			return {
+			var aes_key = user.session_key;
+			return cipher.aes(JSON.stringify({
 				sender: tokens.shift(),
 				receiver: tokens.shift(),
 				content: tokens.join(' '),
-			}
+			}), aes_key);
 		}
 	}
 }

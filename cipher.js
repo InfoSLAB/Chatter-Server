@@ -7,7 +7,7 @@ module.exports = {
 	aes_gen_key: function() {
 		return rstr.generate(10);
 	},
-	aes: function(plain, key, fn) {
+	aes: function(plain, key) {
 		const cipher = crypto.createCipher('aes192', key);
 		let encrypted = '';
 		cipher.on('readable', () => {
@@ -15,14 +15,19 @@ module.exports = {
 			if (data)
 				encrypted += data.toString('hex');
 		});
+		var flag = false;
 		cipher.on('end', () => {
-			fn(encrypted);
+			flag = true;
 		});
 		cipher.write(plain);
 		cipher.end();
+		while (!flag) {
+			require('deasync').runLoopOnce();
+		}
+		return encrypted;
 	},
 	rsa_gen_key_pair: function() {
-		var key_pair = new NodeRsa({b: 2048});
+		var key_pair = new NodeRsa({b: 256});
 		var privKeyStr = key_pair.exportKey('pkcs8-private-pem');
 		var pubKeyStr = key_pair.exportKey('pkcs8-public-pem');
 		return {
@@ -41,6 +46,10 @@ module.exports = {
 		return encrypted;
 	},
 }
+
+// var cipher = require('./cipher');
+// var decipher = require('./decipher');
+// console.log(decipher.aes(cipher.aes('hahahaha', 'pass'), 'pass'));
 
 // var key = new NodeRsa({b: 512});
 // var privKeyStr = (key.exportKey('pkcs8-private-pem'));

@@ -26,32 +26,6 @@ function processInput(err, result) {
 	var tokens = result.command.split(' ');
 	var cmd = tokens.shift();
 	socket.emit(cmd, cli_util.message[cmd](tokens, user));
-	// command_mapper = {
-	// 	'login': {
-	// 		username: tokens[0],
-	// 	},
-	// 	'login-ack': {
-	// 		username: tokens[0],
-	// 		challenge: parseInt(tokens[1], 10),
-	// 	},
-	// 	'register': {
-	// 		email: tokens[0],
-	// 		username: tokens[1],
-	// 		pubkey: tokens[2],
-	// 	},
-	// 	'friend': {
-	// 		sender: tokens[0],
-	// 		receiver: tokens[1],
-	// 		type: tokens[2],  // (q)uery, (a)ccept, (d)eny, (l)ist
-	// 	},
-	// 	'chat': {
-	// 		sender: tokens.shift(),
-	// 		receiver: tokens.shift(),
-	// 		content: tokens.join(' '),
-	// 	}
-	// }
-	// var data = command_mapper[cmd];
-	// socket.emit(cmd, data);
 	prompt.get(['command'], (err, result) => processInput(err, result));
 }
 
@@ -109,6 +83,8 @@ KM0b9RS/BgiUEZqQw7T+/J8SGd9tbfs2RED9ewiBAdWjyxvnS2/ZfIDA4UG2/70c
         'jiji',
     ],
 }
+
+var username = process.argv[2];
 
 // for (var cmd in cli_util.handler) {
 // 	console.log('register listener for cmd:', cmd)
