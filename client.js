@@ -1,72 +1,106 @@
-var decipher = require('./decipher');
-var cipher = require('./cipher');
-var io = require('socket.io-client');
-var cli_util = require('./client_util');
-var aes_key = 'a password';
+const io = require('socket.io-client');
+const $ = require("jquery");
+const decipher = require('./decipher');
+const cipher = require('./cipher');
+const cli_util = require('./client_util');
+const NodeRsa = require('node-rsa');
 
-var socket = io('http://localhost:3000');
-socket.on('connect', function() {
-	console.log('socket connected');
-});
-var prompt = require('prompt');
+const commands = ['login', 'login-ack', 'register', 'friend', 'chat', 'file'];
 
-prompt.start();
-prompt.get(['command'], (err, result) => processInput(err, result));
-
-var username;
-var commands = ['login', 'login-ack', 'register', 'friend', 'chat', 'file'];
-function processInput(err, result) {
-	if (err) { return onErr(err); }
-	if (result.command === 'quit') {
-		onQuit(result);
-		return;
-	}
-	// console.log("Commandline input received:");
-	// console.log("\tCommand: " + result.command);
-	var tokens = result.command.split(' ');
-	var cmd = tokens.shift();
-	socket.emit(cmd, cli_util.message[cmd](tokens, user));
-	prompt.get(['command'], (err, result) => processInput(err, result));
-}
-
-var username = process.argv[2];
-var user = cli_util.load_user(username ? username : 'joker');
-console.log('load user:', user.username);
-
-// for (var cmd in cli_util.handler) {
-// 	console.log('register listener for cmd:', cmd)
-// 	socket.on(cmd, function(data) {
-// 		console.log('response of', cmd);
-// 		cli_util.handler[cmd](data, user);
-// 	});
-// }
-
-socket.on('login', function(data) {
-	cli_util.handler['login'](data, user);
-});
-
-socket.on('login-ack', function(data) {
-	cli_util.handler['login-ack'](data, user);
-});
-
-socket.on('register', function(data) {
-	cli_util.handler['register'](data, user);
-});
-
-socket.on('friend', function(data) {
-	cli_util.handler['friend'](data, user);
-});
-
-socket.on('chat', function (data) {
-	cli_util.handler['chat'](data, user);
-});
+let tempKey;
 
 function onErr(err) {
-	console.log(err);
-	return;
+    console.log(err);
 }
 
 function onQuit(result) {
-	socket.disconnect();
-	console.log(result);
+    socket.disconnect();
+    console.log(result);
 }
+
+function loadUser(username) {
+    const privkey = prompt("your key");
+    const pubkey = new NodeRsa(privkey).exportKey('public');
+    // const server_pubkey = prompt("server key");
+    return {
+        username: username,
+        pubkey: pubkey,
+        privkey: privkey,
+        server_pubkey: server_pubkey,
+    }
+}
+
+$(function () {
+
+    const socket = io('http://localhost:3000');
+    socket.on('connect', function () {
+        console.log('socket connected');
+    });
+
+    const username = prompt("user name", "joker");
+    const user = loadUser(username ? username : 'joker');
+    console.log('load user:', user);
+
+    function append(element) {
+        $('#messages').append($('<li>').append(element));
+    }
+
+    function createDownload(fileName, blob) {
+        return $('<a>').text(fileName).attr('href', URL.createObjectURL(blob)).attr('download', fileName);
+    }
+
+    $("#msgBtn").click(function () {
+        const tokens = $('#m').val().split(' ');
+        const cmd = tokens.shift();
+        socket.emit(cmd, cli_util.message[cmd](tokens, user));
+        $('#m').val = '';
+    });
+
+    // socket.on('chat', function (msg) {
+    //     append($('<span>').text(msg));
+    //     window.scrollTo(0, document.body.scrollHeight);
+    // });
+
+    socket.on('login', function (data) {
+        cli_util.handler['login'](data, user);
+    });
+
+    socket.on('login-ack', function (data) {
+        cli_util.handler['login-ack'](data, user);
+    });
+
+    socket.on('register', function (data) {
+        cli_util.handler['register'](data, user);
+    });
+
+    socket.on('friend', function (data) {
+        cli_util.handler['friend'](data, user);
+    });
+
+    socket.on('chat', function (data) {
+        cli_util.handler['chat'](data, user);
+    });
+
+    $('#post').change(function () {
+        const recipient = $('#userList').val();
+        let files = $('#post')[0].files;
+        if (files.length !== 0) {
+            let reader = new FileReader();
+            reader.onload = function (evt) {
+                let file = evt.target.result;
+                // TODO
+            };
+            reader.readAsDataURL(files[0]);
+        }
+    });
+});
+
+const server_pubkey = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAg//il5Vo+NQm7g2DE8JC
+nAXsJUxNVHB9LsZ1i3FuMdXlKUMC28neKJfOSAUOaf1r/4iazcac1iBOAEIGrqs5
+IuqDfWDoSnFR8aMGsh+rzurPCoTu0sM0VuRpTvDwnEn0lg+MXjvdkKUR+kuZ01cS
+pvvVRzv43Rtv+l60M4gHY0/m/5GqhyIi5uIgRMnIq+ICPKxauksR0OhuhRDkmGDl
+Nuhr/sdrEfUT/qe7N1VCHbgno0dQLnZh5Q8dZSIZGYXqt02HLEVFBbLU1fLlZQSE
+KM0b9RS/BgiUEZqQw7T+/J8SGd9tbfs2RED9ewiBAdWjyxvnS2/ZfIDA4UG2/70c
++QIDAQAB
+-----END PUBLIC KEY-----`;
