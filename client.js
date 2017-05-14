@@ -7,8 +7,6 @@ const NodeRsa = require('node-rsa');
 
 const commands = ['login', 'login-ack', 'register', 'friend', 'chat', 'file'];
 
-let tempKey;
-
 function onErr(err) {
     console.log(err);
 }
