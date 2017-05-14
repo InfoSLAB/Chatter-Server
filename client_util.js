@@ -88,3 +88,19 @@ module.exports = {
 		}
 	}
 }
+
+module.exports.load_user = function(username) {
+	var fs = require('fs');
+	var privkey = fs.readFileSync(__dirname + '/' + username, 'utf8');
+	var pubkey = fs.readFileSync(__dirname + '/' + username + '.pub', 'utf8');
+	var server_pubkey = fs.readFileSync(__dirname + '/id_rsa.pub', 'utf8');
+	return {
+		username: username,
+		pubkey: pubkey,
+		privkey: privkey,
+		server_pubkey: server_pubkey,
+	}
+}
+
+// console.log(load_user('joker'));
+// console.log(load_user);
