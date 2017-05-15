@@ -1,6 +1,6 @@
 module.exports = {
-    save: function(user) {
-        var username = user.username;
+    save: function (user) {
+        const username = user.username;
         if (!user_list[username]) {
             user_list[username] = user;
             return true;
@@ -8,10 +8,10 @@ module.exports = {
             return false;
         }
     },
-    getByName: function(username) {
+    getByName: function (username) {
         return user_list[username];
     }
-}
+};
 
 user_list = {
     joker: {
@@ -52,4 +52,4 @@ QwIDAQAB
         pubkey: ``,
         friends: [],
     }
-}
+};

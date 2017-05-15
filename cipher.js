@@ -13,7 +13,7 @@ module.exports = {
         return encrypted;
     },
     rsa_gen_key_pair: function () {
-        const key_pair = new NodeRsa({b: 256});
+        const key_pair = new NodeRsa({b: 512});
         const privKeyStr = key_pair.exportKey('pkcs8-private-pem');
         const pubKeyStr = key_pair.exportKey('pkcs8-public-pem');
         return {

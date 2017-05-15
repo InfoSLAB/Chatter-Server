@@ -54,6 +54,7 @@ io.on('connection', function (socket) {
             challenge: enc_challenge,
             cha_res: enc_cli_cha_res
         });
+        console.log('encrypted_aes_key: ' + encrypted_aes_key);
     });
     socket.on('login-ack', function (data) {
         if (authentication({is_online: is_online}, socket)) {
@@ -247,12 +248,11 @@ function authentication(prereq, socket) {
 }
 
 function getFriends(username, online) {
-    // TODO get real friends
-    const mock_friends = {joker: ['jiji'], jiji: ['joker']};
+    const friends = db.getByName(username).friends;
     if (!online)
-        return mock_friends[username];
+        return friends;
     else
-        return mock_friends[username].filter(un => online_users.has(un));
+        return friends.filter(un => online_users.has(un));
 }
 
 var server_privkey = `-----BEGIN PRIVATE KEY-----

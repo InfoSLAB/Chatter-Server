@@ -18,7 +18,7 @@ function onQuit(result) {
 
 function loadUser(username) {
     const privkey = prompt("your key");
-    const pubkey = new NodeRsa(privkey).exportKey('public');
+    const pubkey = new NodeRsa(privkey).exportKey('pkcs8-public-pem');
     // const server_pubkey = prompt("server key");
     return {
         username: username,
@@ -30,22 +30,39 @@ function loadUser(username) {
 
 $(function () {
 
-    const socket = io('http://localhost:3000');
+    const socket = io('http://192.168.31.44:3000');
     socket.on('connect', function () {
         console.log('socket connected');
     });
 
-    const username = prompt("user name", "joker");
-    const user = loadUser(username ? username : 'joker');
-    console.log('load user:', user);
+    let user = null;
+
+    if (confirm("Are you a new user?")) {
+        const username = prompt("user name", "joker");
+        const email = prompt("email", "foo@bar.com");
+        const key = cipher.rsa_gen_key_pair();
+        append($('<span>').text('Please keep your private key safe for latter login:'));
+        append(createDownload('priv_key.pem', new Blob([key.privkey])));
+        user = {
+            username: username,
+            pubkey: key.pubkey,
+            privkey: key.privkey,
+            server_pubkey: server_pubkey,
+        };
+        // can't use process because there're blanks in pubkey
+        socket.emit('register', cli_util.message['register']([email, username, key.pubkey], user));
+    } else {
+        const username = prompt("user name", "joker");
+        user = loadUser(username ? username : 'joker');
+        console.log('load user:', user);
+        process('login ' + user.username);
+    }
 
     function process(proc_string) {
         const tokens = proc_string.split(' ');
         const cmd = tokens.shift();
         socket.emit(cmd, cli_util.message[cmd](tokens, user));
     }
-
-    process('login ' + user.username);
 
     function append(element) {
         $('#messages').append($('<li>').append(element));
@@ -56,8 +73,25 @@ $(function () {
     }
 
     $("#msgBtn").click(function () {
-        process('chat ' + user.username + ' ' + $('#friendList').val() + ' ' + $('#m').val());
-        $('#m').val('');
+        const friendList = $('#friendList');
+        const m = $('#m');
+        if (friendList.val() && m.val()) {
+            process('chat ' + user.username + ' ' + friendList.val() + ' ' + m.val());
+            m.val('');
+        }
+    });
+
+    $('#post').change(function () {
+        const recipient = $('#friendList').val();
+        let files = $('#post')[0].files;
+        if (files.length !== 0) {
+            let reader = new FileReader();
+            reader.onload = function (evt) {
+                let file = evt.target.result;
+                process('file ' + user.username + ' ' + $('#friendList').val() + ' ' + files[0].name + ' ' + file);
+            };
+            reader.readAsDataURL(files[0]);
+        }
     });
 
     socket.on('chat', function (data) {
@@ -85,15 +119,12 @@ $(function () {
 
     socket.on('register', function (data) {
         cli_util.handler['register'](data, user);
+        process('login ' + user.username);
     });
 
     socket.on('friend', function (data) {
         cli_util.handler['friend'](data, user);
     });
-
-    // socket.on('chat', function (data) {
-    //     cli_util.handler['chat'](data, user);
-    // });
 
     socket.on("friend-list", function (data) {
         const friendList = $('#friendList');
@@ -103,19 +134,6 @@ $(function () {
             friendList.append("<option value='" + value + "'>" + value + "</option>");
         if (selected)
             friendList.val(selected);
-    });
-
-    $('#post').change(function () {
-        const recipient = $('#friendList').val();
-        let files = $('#post')[0].files;
-        if (files.length !== 0) {
-            let reader = new FileReader();
-            reader.onload = function (evt) {
-                let file = evt.target.result;
-                process('file ' + user.username + ' ' + $('#friendList').val() + ' ' + files[0].name + ' ' + file);
-            };
-            reader.readAsDataURL(files[0]);
-        }
     });
 });
 

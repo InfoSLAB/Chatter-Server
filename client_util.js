@@ -1,32 +1,6 @@
 const cipher = require('./cipher');
 const decipher = require('./decipher');
-const crypto = require('crypto');
-
-// TODO get public key
-const getPubKey = function (sender) {
-    if (sender === 'joker') {
-        return `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjI4qXazuSMTgLgj8eE/o
-eAQQ/r0RFPeckfiW+zoYKmA5gbRf1IPcVi6ltDTmAxKiz9fO9KQmIQbvzhCaqW3F
-qOSABx9obB9Duh2DVY7rL3VZCL75CKNr6HHahuPvpW13iPrkZjEM9Hh/jl0KUDWV
-fp8amJ/adpcTRo3vwovhdaMv64JLfg/Rpl6A8z+3HExW3UfSLS5R3aWbEGfnMXY8
-jJ+QWAsyilE7LW0b3mZ9KLlQKtfUcDYZGdL5KykcH4rlpg9OsgulhZrjPj+nUq0M
-eEl35LriV4afjo2/Hp/mo1LxG5+tScXItqpvx67pYE3bHnVOT/qZcN/KoFDQ7EWm
-5QIDAQAB
------END PUBLIC KEY-----`;
-    }
-    else if (sender === 'jiji') {
-        return `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyL1Hy+pGn/J6+n2rn2Hc
-shBn+nz1Ub5rShKv2siU9IFdEY3ZlCjIqSD1zVFjXy+O6EqRyNjerb0VvLdRk1Oo
-d+CL+qKA54bXhTm5RPWuGhQJ8MKO53gGxzguMjEBqp9GM1LQRjGGdsTaaxU/Itgt
-+ylreRc25EUezpPMTfPA2P2H5VsbMDMxTPYsPZbP8I8tQH0W1JfNl04kiKTJAmPP
-aVvJCnBGmiXPbY7mPY0jpuQLZ8I8bVnWQ2j38Oi7OEEA6vql3wRx+156yI1zyfZ4
-zJ+mF3GO93dKTWfliroCU48pHy64W4yDBciAXbs3v2ud6U8GqRU5Su6Jjurnv0RX
-QwIDAQAB
------END PUBLIC KEY-----`;
-    }
-};
+const db = require("./db");
 
 module.exports = {
     handler: {
@@ -38,8 +12,10 @@ module.exports = {
             const cha_res = data.cha_res;
             let aes_key = 'empty';
             try {
+                console.log(key, user.privkey);
                 aes_key = decipher.rsa_priv(key, user.privkey);
             } catch (ex) {
+                console.log(ex);
                 console.log('error decrypting session key. Please offer the correct user key.');
                 return;
             }
@@ -75,7 +51,7 @@ module.exports = {
             const filename = data.filename;
             const filedata = data.data;
             const signature = data.signature;
-            if (cipher.hashcode(filedata) === decipher.rsa_pub(signature, getPubKey(sender)))
+            if (cipher.hashcode(filedata) === decipher.rsa_pub(signature, db.getByName(sender).pubkey))
                 return {
                     sender: sender,
                     filename: filename,
@@ -104,6 +80,7 @@ module.exports = {
             }
         },
         register: function (tokens, user) {
+            console.log(tokens);
             return {
                 email: tokens[0],
                 username: tokens[1],
