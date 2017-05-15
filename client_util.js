@@ -1,6 +1,5 @@
 const cipher = require('./cipher');
 const decipher = require('./decipher');
-const db = require("./db");
 
 module.exports = {
     handler: {
@@ -40,7 +39,7 @@ module.exports = {
         },
         friend: function (data, user) {
             const aes_key = user.session_key;
-            console.log(JSON.parse(decipher.aes(data, aes_key)));
+            return JSON.parse(decipher.aes(data, aes_key));
         },
         chat: function (data, user) {
             const aes_key = user.session_key;
@@ -51,7 +50,7 @@ module.exports = {
             const filename = data.filename;
             const filedata = data.data;
             const signature = data.signature;
-            if (cipher.hashcode(filedata) === decipher.rsa_pub(signature, db.getByName(sender).pubkey))
+            if (cipher.hashcode(filedata) === decipher.rsa_pub(signature, user.friendsKey.get(sender)))
                 return {
                     sender: sender,
                     filename: filename,
@@ -80,7 +79,6 @@ module.exports = {
             }
         },
         register: function (tokens, user) {
-            console.log(tokens);
             return {
                 email: tokens[0],
                 username: tokens[1],

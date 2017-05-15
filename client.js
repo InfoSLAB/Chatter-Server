@@ -5,17 +5,6 @@ const cipher = require('./cipher');
 const cli_util = require('./client_util');
 const NodeRsa = require('node-rsa');
 
-const commands = ['login', 'login-ack', 'register', 'friend', 'chat', 'file'];
-
-function onErr(err) {
-    console.log(err);
-}
-
-function onQuit(result) {
-    socket.disconnect();
-    console.log(result);
-}
-
 function loadUser(username) {
     const privkey = prompt("your key");
     const pubkey = new NodeRsa(privkey).exportKey('pkcs8-public-pem');
@@ -30,7 +19,7 @@ function loadUser(username) {
 
 $(function () {
 
-    const socket = io('http://192.168.31.44:3000');
+    const socket = io('http://localhost:3000');
     socket.on('connect', function () {
         console.log('socket connected');
     });
@@ -41,8 +30,8 @@ $(function () {
         const username = prompt("user name", "joker");
         const email = prompt("email", "foo@bar.com");
         const key = cipher.rsa_gen_key_pair();
-        append($('<span>').text('Please keep your private key safe for latter login:'));
-        append(createDownload('priv_key.pem', new Blob([key.privkey])));
+        append($('<span>').text('Please keep your private key safe for latter login: ')
+            .append(createDownload('priv_key.pem', new Blob([key.privkey]))));
         user = {
             username: username,
             pubkey: key.pubkey,
@@ -77,8 +66,15 @@ $(function () {
         const m = $('#m');
         if (friendList.val() && m.val()) {
             process('chat ' + user.username + ' ' + friendList.val() + ' ' + m.val());
+            append($('<span>').text(user.username + ": " + m.val()));
             m.val('');
         }
+    });
+
+    $("#friendBtn").click(function () {
+        const publicIdentity = prompt('the user\'s public identity:');
+        process('friend ' + user.username + ' ' + publicIdentity + ' q');
+        append($('<span>').text('friend request to ' + publicIdentity + ' sent.'));
     });
 
     $('#post').change(function () {
@@ -115,6 +111,7 @@ $(function () {
 
     socket.on('login-ack', function (data) {
         cli_util.handler['login-ack'](data, user);
+        append($('<span>').text(user.username + " login success."));
     });
 
     socket.on('register', function (data) {
@@ -123,15 +120,42 @@ $(function () {
     });
 
     socket.on('friend', function (data) {
-        cli_util.handler['friend'](data, user);
+        const response = cli_util.handler['friend'](data, user);
+        switch (response.type) {
+            case 'q':
+                const span = $('<span>').text(response.sender + " want to make a friend with you:")
+                    .append($("<button>").text('accept').click(function () {
+                        process('friend ' + user.username + ' ' + response.sender + ' a');
+                        span.empty().append('friend request from ' + response.sender + ' accepted');
+                    })).append($("<button>").text('deny').click(function () {
+                        process('friend ' + user.username + ' ' + response.sender + ' d');
+                        span.empty().append('friend request from ' + response.sender + ' denied');
+                    }));
+                append(span);
+                break;
+            case 'd':
+                append($('<span>').text(response.sender + " didn't want to you be a friend."));
+                break;
+            case 'a':
+                append($('<span>').text(response.sender + " accepted you as a friend."));
+                break;
+            default:
+                console.log('query type not supported');
+                return;
+        }
     });
 
     socket.on("friend-list", function (data) {
         const friendList = $('#friendList');
         const selected = friendList.val();
         friendList.empty();
-        for (let value of data)
-            friendList.append("<option value='" + value + "'>" + value + "</option>");
+        if (!user.friendsKey)
+            user.friendsKey = new Map();
+        for (let d of data) {
+            console.log(d);
+            friendList.append("<option value='" + d.username + "'>" + d.username + "</option>");
+            user.friendsKey.set(d.username, d.pubkey);
+        }
         if (selected)
             friendList.val(selected);
     });

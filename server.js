@@ -76,11 +76,7 @@ io.on('connection', function (socket) {
             socket.emit('login-ack', {content: username + ' login success'});
             is_online = true;
             online_users.set(username, {socket: socket, session_key: aes_key});
-
-            const friends = getFriends(username, true);
-
-            socket.emit('friend-list', friends);
-            friends.forEach(un => online_users.get(un).socket.emit('friend-list', getFriends(un, true)));
+            updateFriendList(username);
         } else {
             socket.emit('login-ack', {content: 'login fail'});
             challenge = parseInt(Math.random() * 10000);
@@ -92,12 +88,12 @@ io.on('connection', function (socket) {
             return;
         }
         console.log('receive register', data);
-        var new_user = {};
+        const new_user = {};
         new_user.email = data.email;
         new_user.username = data.username;
         new_user.pubkey = data.pubkey;
         new_user.friends = [];
-        var r = db.save(new_user);
+        const r = db.save(new_user);
         socket.emit('register', {response: r});
     });
     socket.on('friend', function (encrypted) {
@@ -106,6 +102,8 @@ io.on('connection', function (socket) {
             return;
         }
         var data = decipher.aes(encrypted, aes_key);
+
+        // what's this for?
         if (data.sender != username) {
             console.log('sender:', data.sender, 'username:', username);
             data.sender = username;
@@ -117,35 +115,51 @@ io.on('connection', function (socket) {
         var sender = db.getByName(sendername);
         var receiver = db.getByName(receivername);
         var type = data.type;  // (q)uery, (a)ccept, (d)eny, (l)ist
-        if (type != 'l') {
+        if (type === 'q') {
             forwarding_msg(sendername, receivername, {
                 event: 'friend',
                 data: {sender: sendername, receiver: receivername, type: 'q'},
             });
         }
+
+        const friends = sender.friends;
         switch (type) {
             case 'q':
                 sender.friends.push(receivername);
                 break;
             case 'd':
                 // remove sender`s name from receiver`s friend list
-                var index = receiver.friends.indexOf(sendername);
-                if (index > -1) {
+                const index = receiver.friends.indexOf(sendername);
+                if (index > -1)
                     receiver.friends.splice(index, 1);
-                }
+
+                forwarding_msg(sendername, receivername, {
+                    event: 'friend',
+                    data: {sender: sendername, receiver: receivername, type: 'd'},
+                });
+
+                updateFriendList(username);
+
                 break;
             case 'a':
                 sender.friends.push(receivername);
+
+                forwarding_msg(sendername, receivername, {
+                    event: 'friend',
+                    data: {sender: sendername, receiver: receivername, type: 'a'},
+                });
+
+                updateFriendList(username);
+
                 break;
             case 'l':
                 socket.emit('friend',
                     cipher.aes(JSON.stringify({
-                            sender: sendername,
-                            receiver: receivername,
-                            type: 'l',
-                            content: sender.friends
-                        })
-                        , aes_key));
+                        sender: sendername,
+                        receiver: receivername,
+                        type: 'l',
+                        content: sender.friends
+                    }), aes_key));
                 break;
             default:
                 console.log('query type not supported');
@@ -166,7 +180,7 @@ io.on('connection', function (socket) {
         var sendername = data.sender;
         var receivername = data.receiver;
         var msg = data.content;
-        if (check_user_online(sendername) && check_user_online(receivername)) {
+        if (online_users.has(sendername) && online_users.has(receivername)) {
             forwarding_msg(sendername, receivername, {event: 'chat', data: {sender: sendername, content: msg}});
         } else {
             socket.emit('chat',
@@ -192,12 +206,12 @@ io.on('connection', function (socket) {
     });
     socket.on('disconnect', function () {
         for (const username in online_users) {
-            if (online_users.get(username).socket === socket
-            ) {
+            if (online_users.get(username).socket === socket) {
                 console.log(username + " left");
                 online_users.delete(username);
             }
         }
+        updateFriendList(username);
         console.log('client disconnected');
     });
     // socket.emit('test server send', { hello: 'world' });
@@ -213,6 +227,12 @@ function forwarding_msg(snd_nm, recv_nm, packet) {
     console.log('packet data in json string:', JSON.stringify(packet.data));
     var sender = online_users.get(snd_nm);
     var receiver = online_users.get(recv_nm);
+
+    if (!receiver) {
+        console.log('receiver offline');
+        return;
+    }
+
     var sndr_sock = sender.socket;
     var recr_sock = receiver.socket;
     var event = packet.event;
@@ -233,10 +253,6 @@ function forwarding_file(snd_nm, recv_nm, packet) {
     recr_sock.emit(event, data);
 }
 
-function check_user_online(username) {
-    return online_users.has(username);
-}
-
 function authentication(prereq, socket) {
     const is_online = prereq.is_online;
     if (!is_online) {
@@ -247,15 +263,30 @@ function authentication(prereq, socket) {
     return true;
 }
 
-function getFriends(username, online) {
-    const friends = db.getByName(username).friends;
-    if (!online)
-        return friends;
-    else
-        return friends.filter(un => online_users.has(un));
+function getFriendsAndKey(username, online) {
+    let friends = db.getByName(username).friends;
+    if (online)
+        friends = friends.filter(un => online_users.has(un));
+    return friends.map(function (f) {
+        return {
+            username: f, pubkey: db.getByName(f).pubkey
+        }
+    });
 }
 
-var server_privkey = `-----BEGIN PRIVATE KEY-----
+function updateFriendList(username) {
+    if (!online_users.has(username)) {
+        console.log('invalid username: ' + username);
+        return;
+    }
+    const onlineFriendsAndKeys = getFriendsAndKey(username, true);
+    if (online_users.has(username))
+        online_users.get(username).socket.emit('friend-list', onlineFriendsAndKeys);
+    onlineFriendsAndKeys
+        .forEach(f => online_users.get(f.username).socket.emit('friend-list', getFriendsAndKey(f.username, true)));
+}
+
+const server_privkey = `-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCD/+KXlWj41Cbu
 DYMTwkKcBewlTE1UcH0uxnWLcW4x1eUpQwLbyd4ol85IBQ5p/Wv/iJrNxpzWIE4A
 Qgauqzki6oN9YOhKcVHxowayH6vO6s8KhO7SwzRW5GlO8PCcSfSWD4xeO92QpRH6
