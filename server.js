@@ -8,7 +8,6 @@ var port = 3000;
 var decipher = require('./decipher');
 var cipher = require('./cipher');
 var aes_key = 'a password';
-var public_key = 'server public key';
 
 var user = require('./user').createUser;
 var user_list = [];
@@ -18,10 +17,6 @@ app.get('/', function (req, res) {
 });
 
 app.use(express.static('public'));
-
-// app.get('/bundle.js', function(req, res) {
-// 	res.sendFile(__dirname + '/bundle.js');
-// });
 
 io.on('connection', function (socket) {
     var is_online = false;
@@ -79,7 +74,12 @@ io.on('connection', function (socket) {
             console.log(username + ' login success');
             socket.emit('login-ack', {content: username + ' login success'});
             is_online = true;
-            online_users[username] = {socket: socket, session_key: aes_key};
+            online_users.set(username, {socket: socket, session_key: aes_key});
+
+            const friends = getFriends(username, true);
+
+            socket.emit('friend-list', friends);
+            friends.forEach(un => online_users.get(un).socket.emit('friend-list', getFriends(un, true)));
         } else {
             socket.emit('login-ack', {content: 'login fail'});
             challenge = parseInt(Math.random() * 10000);
@@ -178,17 +178,23 @@ io.on('connection', function (socket) {
     socket.on('file', function (data) {
         if (!authentication({is_online: is_online}, socket))
             return;
-        console.log('receive file ' + msg);
-        var sendername = data.sender;
-        var receivername = data.receiver;
-        var file = data.content;
-        // TODO ...
+        console.log('receive file ' + data);
+        const sendername = data.sender;
+        const receivername = data.receiver;
+        const filename = data.filename;
+        const filedata = data.data;
+        const signature = data.signature;
+        forwarding_file(sendername, receivername, {
+            event: 'file',
+            data: {sender: sendername, filename: filename, data: filedata, signature: signature}
+        });
     });
     socket.on('disconnect', function () {
-        for (var username in online_users) {
-            if (online_users[username].socket === socket) {
+        for (const username in online_users) {
+            if (online_users.get(username).socket === socket
+            ) {
                 console.log(username + " left");
-                delete online_users[username];
+                online_users.delete(username);
             }
         }
         console.log('client disconnected');
@@ -200,12 +206,12 @@ http.listen(port, function () {
     console.log('listening on *:' + port);
 });
 
-var online_users = {}
+const online_users = new Map();
 function forwarding_msg(snd_nm, recv_nm, packet) {
     console.log(`forward msg:`, packet, ` from ${snd_nm} to ${recv_nm}`);
     console.log('packet data in json string:', JSON.stringify(packet.data));
-    var sender = online_users[snd_nm];
-    var receiver = online_users[recv_nm];
+    var sender = online_users.get(snd_nm);
+    var receiver = online_users.get(recv_nm);
     var sndr_sock = sender.socket;
     var recr_sock = receiver.socket;
     var event = packet.event;
@@ -215,18 +221,38 @@ function forwarding_msg(snd_nm, recv_nm, packet) {
     recr_sock.emit(event, data);
 }
 
+function forwarding_file(snd_nm, recv_nm, packet) {
+    console.log('forward file:', packet, ` from ${snd_nm} to ${recv_nm}`);
+    console.log('packet data in json string:', JSON.stringify(packet.data));
+    const sender = online_users.get(snd_nm);
+    const receiver = online_users.get(recv_nm);
+    const recr_sock = receiver.socket;
+    const event = packet.event;
+    const data = packet.data;
+    recr_sock.emit(event, data);
+}
+
 function check_user_online(username) {
-    return username in online_users;
+    return online_users.has(username);
 }
 
 function authentication(prereq, socket) {
-    var is_online = prereq.is_online;
+    const is_online = prereq.is_online;
     if (!is_online) {
         console.log('client request not online');
         socket.emit('au-error', {reason: 'client not logged in!'});
         return false;
     }
     return true;
+}
+
+function getFriends(username, online) {
+    // TODO get real friends
+    const mock_friends = {joker: ['jiji'], jiji: ['joker']};
+    if (!online)
+        return mock_friends[username];
+    else
+        return mock_friends[username].filter(un => online_users.has(un));
 }
 
 var server_privkey = `-----BEGIN PRIVATE KEY-----

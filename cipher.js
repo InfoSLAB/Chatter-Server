@@ -29,4 +29,7 @@ module.exports = {
         const key = new NodeRsa(priPem);
         return key.encryptPrivate(plain, 'base64', 'utf8');
     },
+    hashcode: function (data) {
+        return crypto.createHash('md5').update(data).digest('hex');
+    }
 };

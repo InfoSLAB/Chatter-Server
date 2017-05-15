@@ -39,6 +39,14 @@ $(function () {
     const user = loadUser(username ? username : 'joker');
     console.log('load user:', user);
 
+    function process(proc_string) {
+        const tokens = proc_string.split(' ');
+        const cmd = tokens.shift();
+        socket.emit(cmd, cli_util.message[cmd](tokens, user));
+    }
+
+    process('login ' + user.username);
+
     function append(element) {
         $('#messages').append($('<li>').append(element));
     }
@@ -48,19 +56,27 @@ $(function () {
     }
 
     $("#msgBtn").click(function () {
-        const tokens = $('#m').val().split(' ');
-        const cmd = tokens.shift();
-        socket.emit(cmd, cli_util.message[cmd](tokens, user));
-        $('#m').val = '';
+        process('chat ' + user.username + ' ' + $('#friendList').val() + ' ' + $('#m').val());
+        $('#m').val('');
     });
 
-    // socket.on('chat', function (msg) {
-    //     append($('<span>').text(msg));
-    //     window.scrollTo(0, document.body.scrollHeight);
-    // });
+    socket.on('chat', function (data) {
+        const decryptedData = cli_util.handler['chat'](data, user);
+        append($('<span>').text(decryptedData.sender + ": " + decryptedData.content));
+        window.scrollTo(0, document.body.scrollHeight);
+    });
+
+    socket.on('file', function (data) {
+        const decryptedData = cli_util.handler['file'](data, user);
+        fetch(decryptedData.data).then(res => res.blob()).then(blob => {
+            append(createDownload(decryptedData.filename, blob));
+        });
+        window.scrollTo(0, document.body.scrollHeight);
+    });
 
     socket.on('login', function (data) {
         cli_util.handler['login'](data, user);
+        process('login-ack ' + user.username + ' ' + (parseInt(user.server_challenge) + 1));
     });
 
     socket.on('login-ack', function (data) {
@@ -75,18 +91,28 @@ $(function () {
         cli_util.handler['friend'](data, user);
     });
 
-    socket.on('chat', function (data) {
-        cli_util.handler['chat'](data, user);
+    // socket.on('chat', function (data) {
+    //     cli_util.handler['chat'](data, user);
+    // });
+
+    socket.on("friend-list", function (data) {
+        const friendList = $('#friendList');
+        const selected = friendList.val();
+        friendList.empty();
+        for (let value of data)
+            friendList.append("<option value='" + value + "'>" + value + "</option>");
+        if (selected)
+            friendList.val(selected);
     });
 
     $('#post').change(function () {
-        const recipient = $('#userList').val();
+        const recipient = $('#friendList').val();
         let files = $('#post')[0].files;
         if (files.length !== 0) {
             let reader = new FileReader();
             reader.onload = function (evt) {
                 let file = evt.target.result;
-                // TODO
+                process('file ' + user.username + ' ' + $('#friendList').val() + ' ' + files[0].name + ' ' + file);
             };
             reader.readAsDataURL(files[0]);
         }
