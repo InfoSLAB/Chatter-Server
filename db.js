@@ -111,7 +111,7 @@ var MongoClient = require('mongodb').MongoClient
   , assert = require('assert');
 
 // Connection URL
-var url = 'mongodb://localhost:27017/islab-chatter-server';
+var url = 'mongodb://10.131.251.231:27017/islab-chatter-server';
 
 // module.exports.save(user_list.joker);
 // console.log(module.exports.getByName('joker'));
@@ -120,7 +120,7 @@ function init() {
     console.log('db init');
     MongoClient.connect(url, function(err, db) {
       assert.equal(null, err);
-      console.log("Connected successfully to server");
+      console.log("Connected successfully to db server");
 
       var collection = db.collection('users');
       collection.find().toArray(function (err, users) {
@@ -134,10 +134,11 @@ function init() {
 }
 
 function writeback() {
+    // comment this if there is no db available
     console.log('db writeback');
     MongoClient.connect(url, function(err, db) {
       assert.equal(null, err);
-      console.log("Connected successfully to server");
+      console.log("Connected successfully to db server");
 
       var collection = db.collection('users');
       // console.log(user_list);
@@ -148,5 +149,6 @@ function writeback() {
     });
 }
 
+// comment this if there is no db available
 init();
 // setTimeout(writeback, 1000);

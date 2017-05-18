@@ -44,7 +44,7 @@ $(function () {
         console.log('load user:', user);
     }
 
-    const socket = io('http://localhost:3000');
+    const socket = io('http://10.131.251.231:3000');
     socket.on('connect', function () {
         console.log('socket connected');
         if (newUser) {
