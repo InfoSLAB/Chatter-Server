@@ -35,7 +35,10 @@ module.exports = {
             console.log(data);
         },
         register: function (data, user) {
-            console.log(data);
+            return data.response;
+        },
+        'register-ack': function (data, user) {
+            return data.response;
         },
         friend: function (data, user) {
             const aes_key = user.session_key;
@@ -83,6 +86,12 @@ module.exports = {
                 email: tokens[0],
                 username: tokens[1],
                 pubkey: tokens[2],
+            }
+        },
+        'register-ack': function (tokens, user) {
+            return {
+                email: tokens[0],
+                vcode: tokens[1]
             }
         },
         friend: function (tokens, user) {

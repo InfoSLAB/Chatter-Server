@@ -17943,6 +17943,7 @@ Manager.prototype.onopen = function () {
   this.readyState = 'open';
   this.emit('open');
 
+<<<<<<< HEAD
   // add new subs
   var socket = this.engine;
   this.subs.push(on(socket, 'data', bind(this, 'ondata')));
@@ -17951,6 +17952,132 @@ Manager.prototype.onopen = function () {
   this.subs.push(on(socket, 'error', bind(this, 'onerror')));
   this.subs.push(on(socket, 'close', bind(this, 'onclose')));
   this.subs.push(on(this.decoder, 'decoded', bind(this, 'ondecoded')));
+=======
+module.exports = {
+    handler: {
+        login: function (data, user) {
+            console.log(data);
+            const username = data.username;
+            const key = data.key;
+            const challenge = data.challenge;
+            const cha_res = data.cha_res;
+            let aes_key = 'empty';
+            try {
+                console.log(key, user.privkey);
+                aes_key = decipher.rsa_priv(key, user.privkey);
+            } catch (ex) {
+                console.log(ex);
+                console.log('error decrypting session key. Please offer the correct user key.');
+                return;
+            }
+            console.log('session key:', aes_key);
+            user.session_key = aes_key;
+            const cha_res_plain = decipher.aes(cha_res, aes_key);
+            if (parseInt(cha_res_plain) !== user.my_challenge + 1) {
+                console.log('response:', cha_res_plain);
+                console.log('challenge:', user.my_challenge);
+                console.log('server challenge fail.');
+                return;
+            }
+            const challenge_plain = decipher.aes(challenge, aes_key);
+            user.server_challenge = challenge_plain;
+            console.log('server_challenge:', challenge_plain);
+        },
+        'login-ack': function (data, user) {
+            console.log(data);
+        },
+        register: function (data, user) {
+            return data.response;
+        },
+        'register-ack': function (data, user) {
+            return data.response;
+        },
+        friend: function (data, user) {
+            const aes_key = user.session_key;
+            return JSON.parse(decipher.aes(data, aes_key));
+        },
+        chat: function (data, user) {
+            const aes_key = user.session_key;
+            return (JSON.parse(decipher.aes(data, aes_key)));
+        },
+        file: function (data, user) {
+            const sender = data.sender;
+            const filename = data.filename;
+            const filedata = data.data;
+            const signature = data.signature;
+            if (cipher.hashcode(filedata) === decipher.rsa_pub(signature, user.friendsKey.get(sender)))
+                return {
+                    sender: sender,
+                    filename: filename,
+                    data: filedata
+                };
+            console.log("signature doesn't match");
+        }
+    },
+    message: {
+        login: function (tokens, user) {
+            const challenge = parseInt(Math.random() * 10000);
+            console.log('my challenge:', challenge);
+            const enc_challenge = cipher.rsa_pub(challenge.toString(), user.server_pubkey);
+            user.my_challenge = challenge;
+            return {
+                username: tokens[0],
+                challenge: enc_challenge,
+            }
+        },
+        'login-ack': function (tokens, user) {
+            const session_key = user.session_key;
+            const enc_challenge = cipher.aes(tokens[1].toString(), session_key.toString());
+            return {
+                username: tokens[0],
+                challenge: enc_challenge,
+            }
+        },
+        register: function (tokens, user) {
+            return {
+                email: tokens[0],
+                username: tokens[1],
+                pubkey: tokens[2],
+            }
+        },
+        'register-ack': function (tokens, user) {
+            return {
+                email: tokens[0],
+                vcode: tokens[1]
+            }
+        },
+        friend: function (tokens, user) {
+            const aes_key = user.session_key;
+            return cipher.aes(JSON.stringify({
+                sender: tokens[0],
+                receiver: tokens[1],
+                type: tokens[2],  // (q)uery, (a)ccept, (d)eny, (l)ist
+            }), aes_key);
+        },
+        chat: function (tokens, user) {
+            const aes_key = user.session_key;
+            return cipher.aes(JSON.stringify({
+                sender: tokens.shift(),
+                receiver: tokens.shift(),
+                content: tokens.join(' '),
+            }), aes_key);
+        },
+        file: function (tokens, user) {
+            const sender = tokens.shift();
+            const receiver = tokens.shift();
+            const filename = tokens.shift();
+            const data = tokens.shift();
+            const signature = cipher.rsa_priv(cipher.hashcode(data), user.privkey);
+            return {
+                sender: sender,
+                receiver: receiver,
+                filename: filename,
+                data: data,
+                signature: signature
+            };
+        }
+    }
+>>>>>>> d4412e7eeded25d97b86c03a401d3f53a91f1fc2
 };
 
 /**
@@ -28415,6 +28542,7 @@ jQuery._evalUrl = function( url ) {
 	} );
 };
 
+<<<<<<< HEAD
 
 jQuery.fn.extend( {
 	wrapAll: function( html ) {
@@ -28442,6 +28570,63 @@ jQuery.fn.extend( {
 				return elem;
 			} ).append( this );
 		}
+=======
+function loadUser(username) {
+    const privkey = prompt("your key");
+    const pubkey = new NodeRsa(privkey).exportKey('pkcs8-public-pem');
+    // const server_pubkey = prompt("server key");
+    return {
+        username: username,
+        pubkey: pubkey,
+        privkey: privkey,
+        server_pubkey: server_pubkey
+    }
+}
+
+$(function () {
+    let user = null;
+    let newUser = false;
+
+    function changeSpan(span, text) {
+        span.empty().append(text);
+    }
+
+    if (confirm("Are you a new user?")) {
+        newUser = true;
+        const username = prompt("user name", "joker");
+        const email = prompt("email", "foo@bar.com");
+        const key = cipher.rsa_gen_key_pair();
+        user = {
+            username: username,
+            email: email,
+            pubkey: key.pubkey,
+            privkey: key.privkey,
+            server_pubkey: server_pubkey,
+        };
+    }
+    else {
+        const username = prompt("user name", "joker");
+        user = loadUser(username ? username : 'joker');
+        console.log('load user:', user);
+    }
+
+    const socket = io('http://localhost:3000');
+    socket.on('connect', function () {
+        console.log('socket connected');
+        if (newUser) {
+            // can't use process() because there're blanks in pubkey
+            socket.emit('register', cli_util.message['register']([user.email, user.username, user.pubkey], user));
+        }
+        else
+            process('login ' + user.username);
+    });
+
+    function process(proc_string) {
+        const tokens = proc_string.split(' ');
+        const cmd = tokens.shift();
+        socket.emit(cmd, cli_util.message[cmd](tokens, user));
+    }
+>>>>>>> d4412e7eeded25d97b86c03a401d3f53a91f1fc2
 
 		return this;
 	},
@@ -28483,6 +28668,7 @@ jQuery.fn.extend( {
 } );
 
 
+<<<<<<< HEAD
 jQuery.expr.pseudos.hidden = function( elem ) {
 	return !jQuery.expr.pseudos.visible( elem );
 };
@@ -28490,6 +28676,57 @@ jQuery.expr.pseudos.visible = function( elem ) {
 	return !!( elem.offsetWidth || elem.offsetHeight || elem.getClientRects().length );
 };
 
+=======
+    socket.on('register', function (data) {
+        const response = cli_util.handler['register'](data, user);
+        const span = $('<span>').text("Verification code: ")
+            .append('<input id="vcode" autocomplete="off">')
+            .append($("<button>").text('submit').click(function () {
+                const vcode = $('#vcode').val();
+                changeSpan(span, vcode + ' submitted');
+                process('register-ack ' + user.email + ' ' + vcode);
+            }));
+        append(span);
+    });
+
+    socket.on('register-ack', function (data) {
+        const response = cli_util.handler['register-ack'](data, user);
+        console.log(response);
+        if (response == true) {
+            append($('<span>').text('Please keep your private key safe for latter login: ')
+                .append(createDownload('priv_key.pem', new Blob([user.privkey]))));
+            process('login ' + user.username);
+        } else {
+            append($('<span>').text(response));
+        }
+    });
+
+    socket.on('friend', function (data) {
+        const response = cli_util.handler['friend'](data, user);
+        switch (response.type) {
+            case 'q':
+                const span = $('<span>').text(response.sender + " want to make a friend with you:")
+                    .append($("<button>").text('accept').click(function () {
+                        process('friend ' + user.username + ' ' + response.sender + ' a');
+                        changeSpan(span, 'friend request from ' + response.sender + ' accepted');
+                    })).append($("<button>").text('deny').click(function () {
+                        process('friend ' + user.username + ' ' + response.sender + ' d');
+                        changeSpan(span, 'friend request from ' + response.sender + ' denied');
+                    }));
+                append(span);
+                break;
+            case 'd':
+                append($('<span>').text(response.sender + " didn't want to you be a friend."));
+                break;
+            case 'a':
+                append($('<span>').text(response.sender + " accepted you as a friend."));
+                break;
+            default:
+                console.log('query type not supported');
+                return;
+        }
+    });
+>>>>>>> d4412e7eeded25d97b86c03a401d3f53a91f1fc2
 
 
 
