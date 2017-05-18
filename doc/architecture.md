@@ -1,6 +1,6 @@
 #Overview
 整个项目用javascript完成，数据库用的是MongoDB，http服务器用的是Express，后段基于NodeJS，通信用的是socket.io。由于客户端是基于web的，所以支持包括移动端，PC端等常用设备，当然也支持安卓设备。
-Demo服务器可以通过校内网访问http://10.131.251.231:3000 测试。
+Demo服务器: 可以通过校内网访问http://10.131.251.231:3000 测试。
 #Front-End Architecture
 #Back-End Architecture
 ##数据库
