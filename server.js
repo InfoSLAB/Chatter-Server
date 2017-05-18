@@ -14,6 +14,11 @@ var user_list = [];
 
 const email_util = require('./email_util');
 
+process.on('SIGINT', function () {
+    db.writeback();
+    setTimeout(process.exit, 3000);
+});
+
 app.get('/', function (req, res) {
     res.sendFile(__dirname + '/index.html');
 });
