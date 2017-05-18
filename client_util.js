@@ -49,6 +49,8 @@ module.exports = {
             return (JSON.parse(decipher.aes(data, aes_key)));
         },
         file: function (data, user) {
+            const aes_key = user.session_key;
+            data = JSON.parse(decipher.aes(data, aes_key));
             const sender = data.sender;
             const filename = data.filename;
             const filedata = data.data;
@@ -115,16 +117,17 @@ module.exports = {
                 timestamp: Date.now(),
             };
             var objString = JSON.stringify(obj);
-            obj.hash = cihper.hashcode(objString);
+            obj.hash = cipher.hashcode(objString);
             return cipher.aes(JSON.stringify(obj), aes_key);
         },
         file: function (tokens, user) {
+            const aes_key = user.session_key;
             const sender = tokens.shift();
             const receiver = tokens.shift();
             const filename = tokens.shift();
             const data = tokens.shift();
             const signature = cipher.rsa_priv(cipher.hashcode(data), user.privkey);
-            return {
+            var obj = {
                 sender: sender,
                 receiver: receiver,
                 filename: filename,
@@ -132,6 +135,7 @@ module.exports = {
                 signature: signature,
                 timestamp: Date.now(),
             };
+            return cipher.aes(JSON.stringify(obj), aes_key);
         }
     }
 };

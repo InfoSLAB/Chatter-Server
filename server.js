@@ -26,9 +26,32 @@ io.on('connection', function (socket) {
     var aes_key = '';
     console.log('client connected');
     var challenge = parseInt(Math.random() * 10000);
+    var last_timestamp = 0;
 
 
     const newUsers = new Map();
+
+    function check_integrity(obj) {
+        if (!obj.hash) {
+            console.log('no hash!');
+            return 0;
+        }
+        var orig_hash = obj.hash;
+        delete obj.hash;
+        var new_hash = cipher.hashcode(JSON.stringify(obj));
+        if (new_hash === orig_hash)
+            return 1;
+        else
+            return 0;
+    }
+
+    function check_timestamp(cur_ts) {
+        if (cur_ts == undefined)
+            return 1;
+        var flag = last_timestamp < cur_ts ? 1 : 0;
+        last_timestamp = cur_ts;
+        return flag;
+    }
 
     socket.on('login', function (data) {
         if (authentication({is_online: is_online}, socket)) {
@@ -143,6 +166,10 @@ io.on('connection', function (socket) {
             data.sender = username;
         }
         var data = JSON.parse(decipher.aes(encrypted, aes_key));
+        if (!check_integrity(data) || !check_timestamp(data.timestamp)) {
+            console.log('packet is broken or out-dated');
+            return;
+        }
         console.log('receive friend ', data);
         var sendername = data.sender;
         var receivername = data.receiver;
@@ -206,6 +233,10 @@ io.on('connection', function (socket) {
             return;
         }
         var data = JSON.parse(decipher.aes(encrypted, aes_key));
+        if (!check_integrity(data) || !check_timestamp(data.timestamp)) {
+            console.log('packet is broken or out-dated');
+            return;
+        }
         if (data.sender != username) {
             console.log('sender:', data.sender, 'username:', username);
             data.sender = username;
@@ -224,9 +255,14 @@ io.on('connection', function (socket) {
         }
         // TODO forward message to receiver
     });
-    socket.on('file', function (data) {
+    socket.on('file', function (encrypted) {
         if (!authentication({is_online: is_online}, socket))
             return;
+        var data = JSON.parse(decipher.aes(encrypted, aes_key));
+        if (!check_timestamp(data.timestamp)) {
+            console.log('packet is broken or out-dated');
+            return;
+        }
         console.log('receive file ' + data);
         const sendername = data.sender;
         const receivername = data.receiver;
@@ -283,7 +319,9 @@ function forwarding_file(snd_nm, recv_nm, packet) {
     const receiver = online_users.get(recv_nm);
     const recr_sock = receiver.socket;
     const event = packet.event;
-    const data = packet.data;
+    const data = cipher.aes(
+        JSON.stringify(packet.data),
+        receiver.session_key);
     recr_sock.emit(event, data);
 }
 
@@ -298,7 +336,10 @@ function authentication(prereq, socket) {
 }
 
 function getFriendsAndKey(username, online) {
-    let friends = db.getByName(username).friends;
+    var user = db.getByName(username);
+    if (user == undefined || user == null)
+        return;
+    let friends = user.friends;
     if (!friends) {
         console.log('invalid username');
         return;
@@ -322,13 +363,6 @@ function updateFriendList(username) {
         online_users.get(username).socket.emit('friend-list', onlineFriendsAndKeys);
     onlineFriendsAndKeys
         .forEach(f => online_users.get(f.username).socket.emit('friend-list', getFriendsAndKey(f.username, true)));
-}
-
-function check_integrity(data) {
-    if (!data.hash) {
-        console.log('no hash!');
-        return;
-    }
 }
 
 const server_privkey = `-----BEGIN PRIVATE KEY-----
