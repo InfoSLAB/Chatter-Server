@@ -13,39 +13,47 @@ function loadUser(username) {
         username: username,
         pubkey: pubkey,
         privkey: privkey,
-        server_pubkey: server_pubkey,
+        server_pubkey: server_pubkey
     }
 }
 
 $(function () {
-
-    const socket = io('http://localhost:3000');
-    socket.on('connect', function () {
-        console.log('socket connected');
-    });
-
     let user = null;
+    let newUser = false;
+
+    function changeSpan(span, text) {
+        span.empty().append(text);
+    }
 
     if (confirm("Are you a new user?")) {
+        newUser = true;
         const username = prompt("user name", "joker");
         const email = prompt("email", "foo@bar.com");
         const key = cipher.rsa_gen_key_pair();
-        append($('<span>').text('Please keep your private key safe for latter login: ')
-            .append(createDownload('priv_key.pem', new Blob([key.privkey]))));
         user = {
             username: username,
+            email: email,
             pubkey: key.pubkey,
             privkey: key.privkey,
             server_pubkey: server_pubkey,
         };
-        // can't use process because there're blanks in pubkey
-        socket.emit('register', cli_util.message['register']([email, username, key.pubkey], user));
-    } else {
+    }
+    else {
         const username = prompt("user name", "joker");
         user = loadUser(username ? username : 'joker');
         console.log('load user:', user);
-        process('login ' + user.username);
     }
+
+    const socket = io('http://localhost:3000');
+    socket.on('connect', function () {
+        console.log('socket connected');
+        if (newUser) {
+            // can't use process() because there're blanks in pubkey
+            socket.emit('register', cli_util.message['register']([user.email, user.username, user.pubkey], user));
+        }
+        else
+            process('login ' + user.username);
+    });
 
     function process(proc_string) {
         const tokens = proc_string.split(' ');
@@ -115,8 +123,27 @@ $(function () {
     });
 
     socket.on('register', function (data) {
-        cli_util.handler['register'](data, user);
-        process('login ' + user.username);
+        const response = cli_util.handler['register'](data, user);
+        const span = $('<span>').text("Verification code: ")
+            .append('<input id="vcode" autocomplete="off">')
+            .append($("<button>").text('submit').click(function () {
+                const vcode = $('#vcode').val();
+                changeSpan(span, vcode + ' submitted');
+                process('register-ack ' + user.email + ' ' + vcode);
+            }));
+        append(span);
+    });
+
+    socket.on('register-ack', function (data) {
+        const response = cli_util.handler['register-ack'](data, user);
+        console.log(response);
+        if (response == true) {
+            append($('<span>').text('Please keep your private key safe for latter login: ')
+                .append(createDownload('priv_key.pem', new Blob([user.privkey]))));
+            process('login ' + user.username);
+        } else {
+            append($('<span>').text(response));
+        }
     });
 
     socket.on('friend', function (data) {
@@ -126,10 +153,10 @@ $(function () {
                 const span = $('<span>').text(response.sender + " want to make a friend with you:")
                     .append($("<button>").text('accept').click(function () {
                         process('friend ' + user.username + ' ' + response.sender + ' a');
-                        span.empty().append('friend request from ' + response.sender + ' accepted');
+                        changeSpan(span, 'friend request from ' + response.sender + ' accepted');
                     })).append($("<button>").text('deny').click(function () {
                         process('friend ' + user.username + ' ' + response.sender + ' d');
-                        span.empty().append('friend request from ' + response.sender + ' denied');
+                        changeSpan(span, 'friend request from ' + response.sender + ' denied');
                     }));
                 append(span);
                 break;

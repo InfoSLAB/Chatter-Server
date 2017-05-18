@@ -12,6 +12,8 @@ var aes_key = 'a password';
 var user = require('./user').createUser;
 var user_list = [];
 
+const email_util = require('./email_util');
+
 app.get('/', function (req, res) {
     res.sendFile(__dirname + '/index.html');
 });
@@ -24,6 +26,10 @@ io.on('connection', function (socket) {
     var aes_key = '';
     console.log('client connected');
     var challenge = parseInt(Math.random() * 10000);
+
+
+    const newUsers = new Map();
+
     socket.on('login', function (data) {
         if (authentication({is_online: is_online}, socket)) {
             socket.emit('login', {content: 'you are already login'});
@@ -93,8 +99,36 @@ io.on('connection', function (socket) {
         new_user.username = data.username;
         new_user.pubkey = data.pubkey;
         new_user.friends = [];
-        const r = db.save(new_user);
-        socket.emit('register', {response: r});
+        const vcode = parseInt(Math.random() * 10000);
+        new_user.vcode = vcode;
+
+        newUsers.set(data.email, new_user);
+
+        console.log(new_user.email, new_user.vcode);
+
+        email_util.sendEmail(new_user.email, new_user.username, new_user.vcode);
+
+        socket.emit('register', {response: 'please check your email box for verification code'});
+    });
+    socket.on('register-ack', function (data) {
+        if (authentication({is_online: is_online}, socket)) {
+            socket.emit('register', {content: 'please log out first'});
+            return;
+        }
+        console.log('receive register-ack', data);
+
+        if (newUsers.has(data.email)) {
+            const newUser = newUsers.get(data.email);
+            if (parseInt(data.vcode) === newUser.vcode) {
+                delete newUser.vcode;
+                const r = db.save(newUser);
+                socket.emit('register-ack', {response: r});
+            } else
+                socket.emit('register-ack', {response: 'invalid vcode'});
+        }
+        else {
+            socket.emit('register-ack', {response: 'invalid email'});
+        }
     });
     socket.on('friend', function (encrypted) {
         if (!authentication({is_online: is_online}, socket)) {
@@ -205,8 +239,9 @@ io.on('connection', function (socket) {
         });
     });
     socket.on('disconnect', function () {
-        for (const username in online_users) {
-            if (online_users.get(username).socket === socket) {
+        for (let [username, object] of online_users) {
+            console.log(object.socket.id, socket.id);
+            if (object.socket.id === socket.id) {
                 console.log(username + " left");
                 online_users.delete(username);
             }
@@ -214,7 +249,6 @@ io.on('connection', function (socket) {
         updateFriendList(username);
         console.log('client disconnected');
     });
-    // socket.emit('test server send', { hello: 'world' });
 });
 
 http.listen(port, function () {
@@ -265,6 +299,10 @@ function authentication(prereq, socket) {
 
 function getFriendsAndKey(username, online) {
     let friends = db.getByName(username).friends;
+    if (!friends) {
+        console.log('invalid username');
+        return;
+    }
     if (online)
         friends = friends.filter(un => online_users.has(un));
     return friends.map(function (f) {
@@ -275,11 +313,11 @@ function getFriendsAndKey(username, online) {
 }
 
 function updateFriendList(username) {
-    if (!online_users.has(username)) {
-        console.log('invalid username: ' + username);
+    const onlineFriendsAndKeys = getFriendsAndKey(username, true);
+    if (!onlineFriendsAndKeys) {
+        console.log('unable to get friends and keys');
         return;
     }
-    const onlineFriendsAndKeys = getFriendsAndKey(username, true);
     if (online_users.has(username))
         online_users.get(username).socket.emit('friend-list', onlineFriendsAndKeys);
     onlineFriendsAndKeys
