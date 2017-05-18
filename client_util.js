@@ -87,19 +87,27 @@ module.exports = {
         },
         friend: function (tokens, user) {
             const aes_key = user.session_key;
-            return cipher.aes(JSON.stringify({
+            var obj = {
                 sender: tokens[0],
                 receiver: tokens[1],
                 type: tokens[2],  // (q)uery, (a)ccept, (d)eny, (l)ist
-            }), aes_key);
+                timestamp: Date.now(),
+            };
+            var objString = JSON.stringify(obj);
+            obj.hash = cipher.hashcode(objString);
+            return cipher.aes(JSON.stringify(obj), aes_key);
         },
         chat: function (tokens, user) {
             const aes_key = user.session_key;
-            return cipher.aes(JSON.stringify({
+            var obj = {
                 sender: tokens.shift(),
                 receiver: tokens.shift(),
                 content: tokens.join(' '),
-            }), aes_key);
+                timestamp: Date.now(),
+            };
+            var objString = JSON.stringify(obj);
+            obj.hash = cihper.hashcode(objString);
+            return cipher.aes(JSON.stringify(obj), aes_key);
         },
         file: function (tokens, user) {
             const sender = tokens.shift();
@@ -112,7 +120,8 @@ module.exports = {
                 receiver: receiver,
                 filename: filename,
                 data: data,
-                signature: signature
+                signature: signature,
+                timestamp: Date.now(),
             };
         }
     }

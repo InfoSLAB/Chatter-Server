@@ -286,6 +286,13 @@ function updateFriendList(username) {
         .forEach(f => online_users.get(f.username).socket.emit('friend-list', getFriendsAndKey(f.username, true)));
 }
 
+function check_integrity(data) {
+    if (!data.hash) {
+        console.log('no hash!');
+        return;
+    }
+}
+
 const server_privkey = `-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCD/+KXlWj41Cbu
 DYMTwkKcBewlTE1UcH0uxnWLcW4x1eUpQwLbyd4ol85IBQ5p/Wv/iJrNxpzWIE4A
